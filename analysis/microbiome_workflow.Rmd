@@ -1,0 +1,159 @@
+---
+title: "End-to-end 16S rRNA Workflow"
+author: "Microbiome Analytics"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+library(targets)
+library(tidyverse)
+library(phyloseq)
+```
+
+# Overview
+
+This document reports on an amplicon sequencing workflow implemented with **dada2**, **phyloseq**, **decontam**, **vegan**, **ANCOM-BC**, **Maaslin2**, **microbiome**, and **targets**. Run the computational pipeline with:
+
+```r
+renv::activate()
+tar_make()
+```
+
+Once the pipeline completes, re-knit this R Markdown document to summarise the analysis products stored in the `targets` cache.
+
+# Data import and quality control
+
+```{r load-data}
+tar_load(fastq_table)
+tar_load(quality_profiles)
+tar_load(metadata)
+fastq_table
+```
+
+Quality profiles for the first few samples are saved as PNG images. Example paths:
+
+```{r quality-profiles}
+head(quality_profiles)
+```
+
+# DADA2 processing
+
+```{r dada2}
+tar_load(filtered_reads)
+tar_load(error_models)
+tar_load(asv_results)
+tar_load(seqtab_nochim)
+tar_load(contaminant_results)
+filtered_reads
+```
+
+Reads retained after filtering:
+
+```{r filter-summary}
+filtered_reads |>
+  select(sample_id, reads_in, reads_out)
+```
+
+Contaminant ASVs flagged by **decontam**:
+
+```{r contaminants}
+contaminant_results$removed_asvs
+```
+
+# Taxonomy, phylogeny, and phyloseq object
+
+```{r phyloseq}
+tar_load(taxonomy)
+tar_load(phy_tree)
+tar_load(physeq)
+physeq
+```
+
+# Alpha- and beta-diversity
+
+```{r diversity}
+tar_load(alpha_diversity)
+tar_load(beta_diversity)
+tar_load(ordinations)
+alpha_diversity
+```
+
+```{r beta}
+beta_diversity$distance_tidy |>
+  head()
+```
+
+Ordination coordinates joined to metadata:
+
+```{r ordination}
+tar_load(metadata)
+ord_df <- combine_ord_coord(ordinations, metadata)
+head(ord_df)
+```
+
+# PERMANOVA
+
+```{r permanova}
+tar_load(permanova)
+permanova
+```
+
+# Differential abundance analyses
+
+```{r da}
+tar_load(ancombc_results)
+tar_load(maaslin2_results)
+head(ancombc_results)
+```
+
+```{r maaslin}
+head(maaslin2_results)
+```
+
+# Core microbiome
+
+```{r core}
+tar_load(core_microbiome)
+core_microbiome
+```
+
+# Functional predictions
+
+```{r functional}
+tar_load(function_predictions)
+tar_load(pathway_analysis)
+function_predictions$method
+```
+
+Top pathways differentiating groups:
+
+```{r pathways}
+pathway_analysis$summary |>
+  head()
+```
+
+```{r pathway-plot}
+pathway_analysis$plot
+```
+
+# Reproducibility
+
+The workflow leverages:
+
+- **renv** for dependency management (see `renv.lock`).
+- **targets** for orchestrating the pipeline (see `_targets.R`).
+- **RMarkdown** for literate documentation (this document).
+
+To reproduce the analysis on a new machine:
+
+1. Clone the repository.
+2. Run `renv::restore()` to install required packages.
+3. Place raw FASTQ files in `data/raw/` and update metadata as needed.
+4. Download the SILVA/GTDB reference database into `references/` and update `_targets.R` if the paths differ.
+5. Execute the pipeline with `tar_make()`.
+6. Render this report using `rmarkdown::render("analysis/microbiome_workflow.Rmd")`.

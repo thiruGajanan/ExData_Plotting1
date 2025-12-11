@@ -1,114 +1,66 @@
-## Introduction
+# Amplicon Sequencing Workflow
 
-This assignment uses data from
-the <a href="http://archive.ics.uci.edu/ml/">UC Irvine Machine
-Learning Repository</a>, a popular repository for machine learning
-datasets. In particular, we will be using the "Individual household
-electric power consumption Data Set" which I have made available on
-the course web site:
+This repository implements an end-to-end 16S rRNA gene amplicon workflow that imports raw FASTQ files, infers amplicon sequence variants (ASVs) with **dada2**, removes contaminants with **decontam**, constructs a **phyloseq** object, performs diversity and ordination analyses, tests for differential abundance, predicts functional potential, and documents the results in R Markdown. The pipeline is orchestrated with **targets** and dependencies are tracked with **renv** for full reproducibility.
 
+## Repository structure
 
-* <b>Dataset</b>: <a href="https://d396qusza40orc.cloudfront.net/exdata%2Fdata%2Fhousehold_power_consumption.zip">Electric power consumption</a> [20Mb]
+```
+analysis/                      R Markdown report that summarises pipeline outputs
+R/                             Modular R functions used by the pipeline
+_targets.R                     targets pipeline definition
+renv.lock                      Locked package versions for reproducibility
+data/
+  raw/                         Place raw paired-end FASTQ files here
+  metadata/                    Sample metadata table (TSV)
+outputs/                       Derived figures and tables
+references/                    Reference training sets (e.g., SILVA/GTDB)
+scripts/                       Helper scripts and automation entry points
+```
 
-* <b>Description</b>: Measurements of electric power consumption in
-one household with a one-minute sampling rate over a period of almost
-4 years. Different electrical quantities and some sub-metering values
-are available.
+Existing plotting scripts from the original coursework submission (`plot1.R` – `plot4.R`) are retained for reference but are not part of the new microbiome workflow.
 
+## Getting started
 
-The following descriptions of the 9 variables in the dataset are taken
-from
-the <a href="https://archive.ics.uci.edu/ml/datasets/Individual+household+electric+power+consumption">UCI
-web site</a>:
+1. **Install dependencies with renv**
+   ```r
+   install.packages("renv")
+   renv::restore()
+   ```
 
-<ol>
-<li><b>Date</b>: Date in format dd/mm/yyyy </li>
-<li><b>Time</b>: time in format hh:mm:ss </li>
-<li><b>Global_active_power</b>: household global minute-averaged active power (in kilowatt) </li>
-<li><b>Global_reactive_power</b>: household global minute-averaged reactive power (in kilowatt) </li>
-<li><b>Voltage</b>: minute-averaged voltage (in volt) </li>
-<li><b>Global_intensity</b>: household global minute-averaged current intensity (in ampere) </li>
-<li><b>Sub_metering_1</b>: energy sub-metering No. 1 (in watt-hour of active energy). It corresponds to the kitchen, containing mainly a dishwasher, an oven and a microwave (hot plates are not electric but gas powered). </li>
-<li><b>Sub_metering_2</b>: energy sub-metering No. 2 (in watt-hour of active energy). It corresponds to the laundry room, containing a washing-machine, a tumble-drier, a refrigerator and a light. </li>
-<li><b>Sub_metering_3</b>: energy sub-metering No. 3 (in watt-hour of active energy). It corresponds to an electric water-heater and an air-conditioner.</li>
-</ol>
+2. **Prepare inputs**
+   - Copy paired-end FASTQ files into `data/raw/` with names such as `SampleA_R1_001.fastq.gz` / `SampleA_R2_001.fastq.gz`.
+   - Update `data/metadata/sample_metadata.tsv` with sample-specific information (include an `is_control` column to flag negative controls).
+   - Download SILVA or GTDB reference training sets into `references/` and adjust the paths in `_targets.R` if required.
 
-## Loading the data
+3. **Run the pipeline**
+   ```r
+   renv::activate()
+   targets::tar_make()
+   ```
 
+4. **Render the report**
+   ```r
+   rmarkdown::render("analysis/microbiome_workflow.Rmd")
+   ```
 
+## Workflow summary
 
+1. **Import FASTQ files and metadata** using `ShortRead` and `dada2`, producing read quality diagnostics saved under `outputs/quality_profiles/`.
+2. **Trim, filter, and infer ASVs** with `dada2`, learn error models, merge paired reads, remove chimeras, and remove contaminants (`decontam`).
+3. **Assign taxonomy** (SILVA/GTDB) and build a comprehensive `phyloseq` object linking ASV counts, taxonomy, sample metadata, and an inferred phylogenetic tree.
+4. **Characterise alpha/beta diversity**, generate ordinations, and test for group-level differences via PERMANOVA (`vegan`).
+5. **Perform differential abundance testing** with ANCOM-BC and MaAsLin2, complemented by core microbiome summaries (`microbiome`).
+6. **Predict functional profiles** via PICRUSt2 (or optionally Tax4Fun2) and highlight pathway shifts between experimental groups.
+7. **Document the analysis** in `analysis/microbiome_workflow.Rmd`, leveraging `targets` for reproducible execution and `renv` for environment capture.
 
+## Key scripts
 
-When loading the dataset into R, please consider the following:
+- `_targets.R` — defines the computational pipeline and dependencies.
+- `analysis/microbiome_workflow.Rmd` — narrative report consuming pipeline outputs.
+- `R/*.R` — modular functions for data import, ASV processing, phyloseq analyses, differential abundance, and functional prediction.
 
-* The dataset has 2,075,259 rows and 9 columns. First
-calculate a rough estimate of how much memory the dataset will require
-in memory before reading into R. Make sure your computer has enough
-memory (most modern computers should be fine).
+## Notes
 
-* We will only be using data from the dates 2007-02-01 and
-2007-02-02. One alternative is to read the data from just those dates
-rather than reading in the entire dataset and subsetting to those
-dates.
-
-* You may find it useful to convert the Date and Time variables to
-Date/Time classes in R using the `strptime()` and `as.Date()`
-functions.
-
-* Note that in this dataset missing values are coded as `?`.
-
-
-## Making Plots
-
-Our overall goal here is simply to examine how household energy usage
-varies over a 2-day period in February, 2007. Your task is to
-reconstruct the following plots below, all of which were constructed
-using the base plotting system.
-
-First you will need to fork and clone the following GitHub repository:
-[https://github.com/rdpeng/ExData_Plotting1](https://github.com/rdpeng/ExData_Plotting1)
-
-
-For each plot you should
-
-* Construct the plot and save it to a PNG file with a width of 480
-pixels and a height of 480 pixels.
-
-* Name each of the plot files as `plot1.png`, `plot2.png`, etc.
-
-* Create a separate R code file (`plot1.R`, `plot2.R`, etc.) that
-constructs the corresponding plot, i.e. code in `plot1.R` constructs
-the `plot1.png` plot. Your code file **should include code for reading
-the data** so that the plot can be fully reproduced. You should also
-include the code that creates the PNG file.
-
-* Add the PNG file and R code file to your git repository
-
-When you are finished with the assignment, push your git repository to
-GitHub so that the GitHub version of your repository is up to
-date. There should be four PNG files and four R code files.
-
-
-The four plots that you will need to construct are shown below. 
-
-
-### Plot 1
-
-
-![plot of chunk unnamed-chunk-2](figure/unnamed-chunk-2.png) 
-
-
-### Plot 2
-
-![plot of chunk unnamed-chunk-3](figure/unnamed-chunk-3.png) 
-
-
-### Plot 3
-
-![plot of chunk unnamed-chunk-4](figure/unnamed-chunk-4.png) 
-
-
-### Plot 4
-
-![plot of chunk unnamed-chunk-5](figure/unnamed-chunk-5.png) 
-
+- The repository includes template metadata and directory placeholders but does not ship with sequencing data or reference databases.
+- Update the `config` list in `_targets.R` to reflect project-specific parameters (e.g., filtering thresholds, PICRUSt2 threads, reference file locations).
+- PICRUSt2 must be installed separately and accessible on the system `PATH` (see [https://github.com/picrust/picrust2](https://github.com/picrust/picrust2)). If unavailable, the functional prediction step returns informative warnings without halting the pipeline.

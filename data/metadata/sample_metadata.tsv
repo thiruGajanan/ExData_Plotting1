@@ -1,0 +1,5 @@
+sample_id	subject_id	collection_date	condition	is_control	batch
+S1	P1	2023-01-01	Control	TRUE	Batch1
+S2	P2	2023-01-02	Control	TRUE	Batch1
+S3	P3	2023-01-03	Treatment	FALSE	Batch1
+S4	P4	2023-01-04	Treatment	FALSE	Batch2
